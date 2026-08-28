@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { paymentVerificationService } from "@/lib/ocr";
+import { notifyPaymentUnderReview } from "@/lib/email/notify";
 import {
   BUCKETS,
   SCREENSHOT_ACCEPTED_TYPES,
@@ -108,9 +109,22 @@ export async function confirmPayment(
 
   if (error) return { ok: false, error: "Could not submit payment." };
 
-  const reg = data as RegistrationRow;
+  const reg = (Array.isArray(data) ? data[0] : data) as RegistrationRow;
   revalidatePath(`/dashboard/payment/${registrationId}`);
   revalidatePath("/dashboard/registrations");
   revalidatePath("/dashboard");
+  revalidatePath("/admin/payments");
+  revalidatePath("/admin/registrations");
+  revalidatePath("/admin");
+
+  // Fire-and-catch notification (best effort — never blocks the response).
+  if (reg.payment_status === "under_review") {
+    try {
+      await notifyPaymentUnderReview(registrationId);
+    } catch (e) {
+      console.error("payment email failed:", e);
+    }
+  }
+
   return { ok: true, status: reg.payment_status };
 }

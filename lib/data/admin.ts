@@ -118,7 +118,7 @@ export async function getRegistrationsAdmin(
   let query = supabase
     .from("registrations")
     .select(
-      "*, event:events(id,slug,title,registration_fee), profile:profiles(id,participant_id,full_name,email,phone)",
+      "*, event:events(id,slug,title,registration_fee), profile:profiles!profile_id(id,participant_id,full_name,email,phone)",
     )
     .order("registered_at", { ascending: false });
 
@@ -139,7 +139,7 @@ export async function getRegistrationAdmin(
   const { data } = await supabase
     .from("registrations")
     .select(
-      "*, event:events(id,slug,title,registration_fee), profile:profiles(id,participant_id,full_name,email,phone)",
+      "*, event:events(id,slug,title,registration_fee), profile:profiles!profile_id(id,participant_id,full_name,email,phone)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -154,7 +154,7 @@ export async function getPaymentQueue(): Promise<
   const { data } = await supabase
     .from("registrations")
     .select(
-      "*, event:events(id,slug,title,registration_fee), profile:profiles(id,participant_id,full_name,email,phone)",
+      "*, event:events(id,slug,title,registration_fee), profile:profiles!profile_id(id,participant_id,full_name,email,phone)",
     )
     .in("payment_status", ["uploaded", "under_review", "duplicate"])
     .order("registered_at", { ascending: true });

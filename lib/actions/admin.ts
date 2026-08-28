@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth";
 import { eventSchema, type EventInput } from "@/lib/validation/event";
+import { notifyPaymentConfirmed } from "@/lib/email/notify";
 import { BUCKETS, PAYMENT_STATUSES, USER_ROLES } from "@/lib/constants";
 
 export type AdminActionState =
@@ -162,6 +163,17 @@ export async function setPaymentStatus(
   revalidatePath(`/admin/payments/${registrationId}`);
   revalidatePath("/admin/registrations");
   revalidatePath("/admin");
+  revalidatePath("/dashboard/registrations");
+
+  // Notify the participant when their payment is verified.
+  if (status === "verified") {
+    try {
+      await notifyPaymentConfirmed(registrationId);
+    } catch (e) {
+      console.error("payment-confirmed email failed:", e);
+    }
+  }
+
   return { ok: true, message: "Payment status updated." };
 }
 

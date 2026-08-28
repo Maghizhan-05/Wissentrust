@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { notifyRegistration } from "@/lib/email/notify";
 import type { RegistrationRow } from "@/types/database";
 
 export type ActionResult = { ok: false; error: string } | { ok: true };
@@ -20,7 +21,17 @@ function mapRpcError(message: string | undefined): string {
   for (const key of Object.keys(RPC_ERRORS)) {
     if (message.includes(key)) return RPC_ERRORS[key];
   }
-  return "Something went wrong. Please try again.";
+  // Common setup problems get a clear, actionable message instead of a
+  // generic one — these mean the DB functions/grants aren't in place.
+  const m = message.toLowerCase();
+  if (m.includes("could not find the function") || m.includes("schema cache")) {
+    return "Registration isn't set up on the server yet (missing database function). Run supabase/migrations/0003_functions.sql on your Supabase project.";
+  }
+  if (m.includes("permission denied")) {
+    return "The server denied the registration function. Re-run supabase/migrations/0003_functions.sql (it grants EXECUTE to authenticated users).";
+  }
+  // Surface the real reason rather than hiding it behind a generic popup.
+  return `Registration failed: ${message}`;
 }
 
 /**
@@ -41,11 +52,30 @@ export async function registerForEvent(formData: FormData): Promise<ActionResult
   const { data, error } = await supabase.rpc("register_for_event", {
     p_event_id: eventId,
   });
-  if (error) return { ok: false, error: mapRpcError(error.message) };
+  if (error) {
+    // Log the full error so it also appears in the Vercel function logs.
+    console.error("register_for_event failed:", error);
+    return { ok: false, error: mapRpcError(error.message) };
+  }
 
-  const reg = data as RegistrationRow;
+  // PostgREST may return the composite row as an object or a single-item array.
+  const reg = (Array.isArray(data) ? data[0] : data) as RegistrationRow | null;
+  if (!reg?.id) {
+    return {
+      ok: false,
+      error: "Registration didn't complete. Please try again.",
+    };
+  }
+
   revalidatePath("/dashboard/registrations");
   revalidatePath(`/events/${slug}`);
+
+  // Best-effort registration email (must run before redirect throws).
+  try {
+    await notifyRegistration(reg.id);
+  } catch (e) {
+    console.error("registration email failed:", e);
+  }
 
   if (reg.payment_status === "verified") {
     // Free event — already confirmed.

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { siteUrl } from "@/lib/utils";
+import { notifyWelcome } from "@/lib/email/notify";
 import {
   forgotSchema,
   loginSchema,
@@ -75,6 +76,15 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
     if (error.message.toLowerCase().includes("already"))
       return { ok: false, error: "An account with this email already exists." };
     return { ok: false, error: error.message };
+  }
+
+  // Welcome email with the participant ID (profile is created by a DB trigger).
+  if (data.user) {
+    try {
+      await notifyWelcome(data.user.id);
+    } catch (e) {
+      console.error("welcome email failed:", e);
+    }
   }
 
   // If email confirmation is disabled, a session exists → go straight in.

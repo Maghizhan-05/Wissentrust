@@ -50,7 +50,7 @@ export async function GET(
     .from("registrations")
     .select(
       "payment_status, registration_status, transaction_id, amount, registered_at, " +
-        "profile:profiles(participant_id, full_name, email, phone, college, course, year)",
+        "profile:profiles!profile_id(participant_id, full_name, email, phone, college, course, year)",
     )
     .eq("event_id", id)
     .order("registered_at", { ascending: true });
