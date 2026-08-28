@@ -4,6 +4,7 @@ import { SectionHeading } from "@/components/ui/section-heading";
 import { Reveal } from "@/components/motion/reveal";
 import { CATEGORY_ICON } from "@/components/events/category-visual";
 import { EVENT_CATEGORIES, EVENT_CATEGORY_LABELS } from "@/lib/constants";
+import type { LandingContent } from "@/lib/content/landing";
 
 const BLURB: Partial<Record<(typeof EVENT_CATEGORIES)[number], string>> = {
   workshop: "Skills stations with real feedback.",
@@ -14,17 +15,21 @@ const BLURB: Partial<Record<(typeof EVENT_CATEGORIES)[number], string>> = {
   academic: "Sessions that sharpen how you work.",
 };
 
-export function Categories() {
+export function Categories({
+  categories,
+}: {
+  categories: LandingContent["categories"];
+}) {
   const shown = EVENT_CATEGORIES.filter((c) => c !== "other");
   return (
     <section className="py-20 md:py-28">
       <Container>
         <Reveal>
           <SectionHeading
-            index="02"
-            eyebrow="Event Categories"
-            title="Six ways to take part."
-            description="Every event routes into one of these tracks. Filter the full programme by category on the events page."
+            index={categories.index}
+            eyebrow={categories.eyebrow}
+            title={categories.title}
+            description={categories.description}
           />
         </Reveal>
 

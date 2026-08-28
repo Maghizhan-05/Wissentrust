@@ -8,6 +8,7 @@ import {
   Users,
   ClipboardList,
   BadgeIndianRupee,
+  LayoutTemplate,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +18,7 @@ const LINKS = [
   { href: "/admin/registrations", label: "Registrations", icon: ClipboardList },
   { href: "/admin/payments", label: "Payments", icon: BadgeIndianRupee },
   { href: "/admin/users", label: "Users", icon: Users },
+  { href: "/admin/content", label: "Landing page", icon: LayoutTemplate },
 ];
 
 export function AdminSidebar() {

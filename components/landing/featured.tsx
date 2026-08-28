@@ -4,13 +4,16 @@ import { Reveal } from "@/components/motion/reveal";
 import { ButtonLink } from "@/components/ui/button";
 import { EventCard } from "@/components/events/event-card";
 import type { EventRow } from "@/types/database";
+import type { LandingContent } from "@/lib/content/landing";
 
 export function Featured({
   events,
   registeredIds,
+  featured,
 }: {
   events: EventRow[];
   registeredIds: Set<string>;
+  featured: LandingContent["featured"];
 }) {
   if (events.length === 0) return null;
   return (
@@ -19,9 +22,9 @@ export function Featured({
         <div className="flex flex-wrap items-end justify-between gap-6">
           <Reveal>
             <SectionHeading
-              index="03"
-              eyebrow="Featured Events"
-              title="Where to start."
+              index={featured.index}
+              eyebrow={featured.eyebrow}
+              title={featured.title}
             />
           </Reveal>
           <Reveal delay={0.1}>

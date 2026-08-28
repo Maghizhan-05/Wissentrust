@@ -7,23 +7,29 @@ import { Journey } from "@/components/landing/journey";
 import { ImportantInfo, FinalCta } from "@/components/landing/info-cta";
 import { getFeaturedEvents } from "@/lib/data/events";
 import { getMyRegisteredEventIds } from "@/lib/data/registrations";
+import { getLandingContent } from "@/lib/data/settings";
 
 export default async function LandingPage() {
-  const [featured, registeredIds] = await Promise.all([
+  const [featured, registeredIds, content] = await Promise.all([
     getFeaturedEvents(4),
     getMyRegisteredEventIds(),
+    getLandingContent(),
   ]);
 
   return (
     <>
-      <Hero />
-      <Intro />
-      <Categories />
-      <Featured events={featured} registeredIds={registeredIds} />
-      <WhyParticipate />
-      <Journey />
-      <ImportantInfo />
-      <FinalCta />
+      <Hero hero={content.hero} />
+      <Intro intro={content.intro} />
+      <Categories categories={content.categories} />
+      <Featured
+        events={featured}
+        registeredIds={registeredIds}
+        featured={content.featured}
+      />
+      <WhyParticipate why={content.why} />
+      <Journey journey={content.journey} />
+      <ImportantInfo info={content.info} />
+      <FinalCta finalCta={content.finalCta} />
     </>
   );
 }

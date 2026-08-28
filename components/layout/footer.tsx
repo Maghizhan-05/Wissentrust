@@ -1,8 +1,13 @@
 import Link from "next/link";
 import { Container } from "@/components/ui/container";
 import { SITE } from "@/lib/constants";
+import { DEFAULT_LANDING, type LandingContent } from "@/lib/content/landing";
 
-export function Footer() {
+export function Footer({
+  footer = DEFAULT_LANDING.footer,
+}: {
+  footer?: LandingContent["footer"];
+}) {
   return (
     <footer className="mt-24 border-t border-border bg-surface/50">
       <Container className="grid gap-10 py-14 md:grid-cols-4">
@@ -11,7 +16,7 @@ export function Footer() {
             {SITE.name}
           </p>
           <p className="mt-3 max-w-sm text-sm text-muted">
-            {SITE.tagline}. A medical symposium of workshops, debates, and
+            {footer.tagline}. A medical symposium of workshops, debates, and
             research presentations — built for the clinically curious.
           </p>
         </div>
@@ -34,8 +39,8 @@ export function Footer() {
           </p>
           <ul className="mt-4 space-y-2 text-sm text-muted">
             <li>Organizing Committee</li>
-            <li><a href="mailto:hello@wissendrust.example" className="hover:text-brand">hello@wissendrust.example</a></li>
-            <li>Feb 12–14, 2027</li>
+            <li><a href={`mailto:${footer.contactEmail}`} className="hover:text-brand">{footer.contactEmail}</a></li>
+            <li>{footer.dates}</li>
           </ul>
         </div>
       </Container>
