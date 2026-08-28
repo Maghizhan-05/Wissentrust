@@ -13,16 +13,13 @@ import { Container } from "@/components/ui/container";
 import { Badge } from "@/components/ui/badge";
 import { EventThumb } from "@/components/events/category-visual";
 import { RegisterCta } from "@/components/events/register-cta";
-import {
-  getEventBySlug,
-  getEventRegistrationCounts,
-} from "@/lib/data/events";
+import { getEventBySlug, getEventRegistrationCounts } from "@/lib/data/events";
 import { getMyRegistrationForEvent } from "@/lib/data/registrations";
 import { getUser } from "@/lib/auth";
-import {
-  EVENT_CATEGORY_LABELS,
-} from "@/lib/constants";
+import { EVENT_CATEGORY_LABELS } from "@/lib/constants";
 import { formatEventDate, formatINR, formatTime } from "@/lib/utils";
+// with the other imports:
+import { EventBackground } from "@/components/three/event-background";
 
 export async function generateMetadata({
   params,
@@ -41,7 +38,9 @@ export async function generateMetadata({
   };
 }
 
-export default async function EventPage({ params }: PageProps<"/events/[slug]">) {
+export default async function EventPage({
+  params,
+}: PageProps<"/events/[slug]">) {
   const { slug } = await params;
   const event = await getEventBySlug(slug);
   if (!event) notFound();
@@ -61,7 +60,11 @@ export default async function EventPage({ params }: PageProps<"/events/[slug]">)
       : null;
 
   const details = [
-    { icon: CalendarDays, label: "Date", value: formatEventDate(event.event_date) },
+    {
+      icon: CalendarDays,
+      label: "Date",
+      value: formatEventDate(event.event_date),
+    },
     {
       icon: Clock,
       label: "Time",
@@ -74,7 +77,10 @@ export default async function EventPage({ params }: PageProps<"/events/[slug]">)
     {
       icon: IndianRupee,
       label: "Fee",
-      value: event.registration_fee === 0 ? "Free" : formatINR(event.registration_fee),
+      value:
+        event.registration_fee === 0
+          ? "Free"
+          : formatINR(event.registration_fee),
     },
     {
       icon: Users,
@@ -93,6 +99,7 @@ export default async function EventPage({ params }: PageProps<"/events/[slug]">)
 
   return (
     <article className="py-10 md:py-14">
+      <EventBackground category={event.category} slug={event.slug} />
       <Container>
         {/* Hero */}
         <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
@@ -108,7 +115,9 @@ export default async function EventPage({ params }: PageProps<"/events/[slug]">)
 
           <div className="order-1 flex flex-col justify-center lg:order-2">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge tone="brand">{EVENT_CATEGORY_LABELS[event.category]}</Badge>
+              <Badge tone="brand">
+                {EVENT_CATEGORY_LABELS[event.category]}
+              </Badge>
               {!event.registration_open && <Badge tone="alert">Closed</Badge>}
               {spotsLeft != null && spotsLeft <= 5 && spotsLeft > 0 && (
                 <Badge tone="warning">{spotsLeft} spots left</Badge>
