@@ -1,0 +1,158 @@
+import { NextResponse, type NextRequest } from "next/server";
+import ExcelJS from "exceljs";
+import { requireAdmin } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
+import {
+  PAYMENT_STATUS_LABELS,
+  REGISTRATION_STATUS_LABELS,
+  type PaymentStatus,
+  type RegistrationStatus,
+} from "@/lib/constants";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+interface ExportRow {
+  participant_id: string | null;
+  full_name: string | null;
+  email: string | null;
+  phone: string | null;
+  college: string | null;
+  course: string | null;
+  year: string | null;
+  payment_status: PaymentStatus;
+  registration_status: RegistrationStatus;
+  transaction_id: string | null;
+  amount: number;
+  registered_at: string;
+}
+
+/** Downloads an .xlsx of participants registered for a single event. */
+export async function GET(
+  _req: NextRequest,
+  ctx: RouteContext<"/admin/events/[id]/export">,
+) {
+  await requireAdmin(); // redirects non-admins
+  const { id } = await ctx.params;
+
+  const supabase = await createClient();
+
+  const { data: event } = await supabase
+    .from("events")
+    .select("slug, title")
+    .eq("id", id)
+    .maybeSingle();
+  if (!event) {
+    return NextResponse.json({ error: "Event not found" }, { status: 404 });
+  }
+
+  const { data } = await supabase
+    .from("registrations")
+    .select(
+      "payment_status, registration_status, transaction_id, amount, registered_at, " +
+        "profile:profiles(participant_id, full_name, email, phone, college, course, year)",
+    )
+    .eq("event_id", id)
+    .order("registered_at", { ascending: true });
+
+  const rows: ExportRow[] = (data ?? []).map((r) => {
+    const rec = r as unknown as {
+      payment_status: PaymentStatus;
+      registration_status: RegistrationStatus;
+      transaction_id: string | null;
+      amount: number;
+      registered_at: string;
+      profile:
+        | {
+            participant_id: string | null;
+            full_name: string | null;
+            email: string | null;
+            phone: string | null;
+            college: string | null;
+            course: string | null;
+            year: string | null;
+          }
+        | Array<Record<string, string | null>>
+        | null;
+    };
+    const p = Array.isArray(rec.profile) ? rec.profile[0] : rec.profile;
+    return {
+      participant_id: p?.participant_id ?? null,
+      full_name: (p?.full_name as string) ?? null,
+      email: (p?.email as string) ?? null,
+      phone: (p?.phone as string) ?? null,
+      college: (p?.college as string) ?? null,
+      course: (p?.course as string) ?? null,
+      year: (p?.year as string) ?? null,
+      payment_status: rec.payment_status,
+      registration_status: rec.registration_status,
+      transaction_id: rec.transaction_id,
+      amount: rec.amount,
+      registered_at: rec.registered_at,
+    };
+  });
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "Wissendrust'27";
+  workbook.created = new Date();
+  const sheet = workbook.addWorksheet("Participants");
+
+  sheet.columns = [
+    { header: "Participant ID", key: "participant_id", width: 16 },
+    { header: "Name", key: "full_name", width: 26 },
+    { header: "Email", key: "email", width: 30 },
+    { header: "Phone", key: "phone", width: 16 },
+    { header: "College", key: "college", width: 28 },
+    { header: "Course", key: "course", width: 14 },
+    { header: "Year", key: "year", width: 14 },
+    { header: "Payment", key: "payment_status", width: 16 },
+    { header: "Registration", key: "registration_status", width: 16 },
+    { header: "Transaction ID", key: "transaction_id", width: 22 },
+    { header: "Amount (INR)", key: "amount", width: 14 },
+    { header: "Registered At", key: "registered_at", width: 22 },
+  ];
+
+  sheet.getRow(1).font = { bold: true };
+  sheet.getRow(1).fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FF0B2528" },
+  };
+  sheet.getRow(1).font = { bold: true, color: { argb: "FF6CEFE2" } };
+
+  for (const r of rows) {
+    sheet.addRow({
+      participant_id: r.participant_id ?? "",
+      full_name: r.full_name ?? "",
+      email: r.email ?? "",
+      phone: r.phone ?? "",
+      college: r.college ?? "",
+      course: r.course ?? "",
+      year: r.year ?? "",
+      payment_status:
+        PAYMENT_STATUS_LABELS[r.payment_status] ?? r.payment_status,
+      registration_status:
+        REGISTRATION_STATUS_LABELS[r.registration_status] ??
+        r.registration_status,
+      transaction_id: r.transaction_id ?? "",
+      amount: r.amount / 100,
+      registered_at: new Date(r.registered_at).toLocaleString("en-IN"),
+    });
+  }
+
+  sheet.getColumn("amount").numFmt = "#,##0.00";
+  sheet.autoFilter = { from: "A1", to: "L1" };
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const filename = `${event.slug}-participants.xlsx`;
+
+  return new NextResponse(buffer as ArrayBuffer, {
+    status: 200,
+    headers: {
+      "Content-Type":
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Cache-Control": "no-store",
+    },
+  });
+}

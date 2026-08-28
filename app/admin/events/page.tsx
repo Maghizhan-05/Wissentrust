@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Plus, Pencil, Star, Trash2 } from "lucide-react";
+import { Plus, Pencil, Star, Trash2, Sheet } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/misc";
@@ -55,7 +55,10 @@ export default async function AdminEventsPage() {
               {events.map((e) => (
                 <tr key={e.id} className="bg-surface hover:bg-surface-2/40">
                   <td className="px-4 py-3">
-                    <Link href={`/events/${e.slug}`} className="font-medium text-foreground hover:text-brand">
+                    <Link
+                      href={`/events/${e.slug}`}
+                      className="font-medium text-foreground hover:text-brand"
+                    >
                       {e.title}
                     </Link>
                     <p className="text-xs text-muted">/{e.slug}</p>
@@ -67,7 +70,9 @@ export default async function AdminEventsPage() {
                     {formatEventDate(e.event_date)}
                   </td>
                   <td className="px-4 py-3 font-mono text-muted">
-                    {e.registration_fee === 0 ? "Free" : formatINR(e.registration_fee)}
+                    {e.registration_fee === 0
+                      ? "Free"
+                      : formatINR(e.registration_fee)}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1.5">
@@ -82,15 +87,32 @@ export default async function AdminEventsPage() {
                       <form action={toggleEventFlag}>
                         <input type="hidden" name="id" value={e.id} />
                         <input type="hidden" name="field" value="featured" />
-                        <input type="hidden" name="value" value={String(e.featured)} />
+                        <input
+                          type="hidden"
+                          name="value"
+                          value={String(e.featured)}
+                        />
                         <button
                           type="submit"
                           title="Toggle featured"
                           className="rounded-md p-2 text-muted hover:bg-surface-2 hover:text-brand"
                         >
-                          <Star className={e.featured ? "size-4 fill-brand text-brand" : "size-4"} />
+                          <Star
+                            className={
+                              e.featured
+                                ? "size-4 fill-brand text-brand"
+                                : "size-4"
+                            }
+                          />
                         </button>
                       </form>
+                      <a
+                        href={`/admin/events/${e.id}/export`}
+                        title="Export participants (Excel)"
+                        className="rounded-md p-2 text-muted hover:bg-surface-2 hover:text-success"
+                      >
+                        <Sheet className="size-4" />
+                      </a>
                       <Link
                         href={`/admin/events/${e.id}/edit`}
                         title="Edit"

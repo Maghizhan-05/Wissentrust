@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Sheet } from "lucide-react";
 import { EventForm } from "@/components/admin/event-form";
 import { updateEvent } from "@/lib/actions/admin";
 import { getEventByIdAdmin } from "@/lib/data/admin";
