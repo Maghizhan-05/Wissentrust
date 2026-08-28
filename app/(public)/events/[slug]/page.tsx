@@ -1,0 +1,195 @@
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import {
+  CalendarDays,
+  Clock,
+  MapPin,
+  IndianRupee,
+  Users,
+  GraduationCap,
+  ListChecks,
+} from "lucide-react";
+import { Container } from "@/components/ui/container";
+import { Badge } from "@/components/ui/badge";
+import { EventThumb } from "@/components/events/category-visual";
+import { RegisterCta } from "@/components/events/register-cta";
+import {
+  getEventBySlug,
+  getEventRegistrationCounts,
+} from "@/lib/data/events";
+import { getMyRegistrationForEvent } from "@/lib/data/registrations";
+import { getUser } from "@/lib/auth";
+import {
+  EVENT_CATEGORY_LABELS,
+} from "@/lib/constants";
+import { formatEventDate, formatINR, formatTime } from "@/lib/utils";
+
+export async function generateMetadata({
+  params,
+}: PageProps<"/events/[slug]">): Promise<Metadata> {
+  const { slug } = await params;
+  const event = await getEventBySlug(slug);
+  if (!event) return { title: "Event not found" };
+  return {
+    title: event.title,
+    description: event.short_description,
+    openGraph: {
+      title: event.title,
+      description: event.short_description,
+      images: event.hero_image ? [event.hero_image] : undefined,
+    },
+  };
+}
+
+export default async function EventPage({ params }: PageProps<"/events/[slug]">) {
+  const { slug } = await params;
+  const event = await getEventBySlug(slug);
+  if (!event) notFound();
+
+  const [user, existing, counts] = await Promise.all([
+    getUser(),
+    getMyRegistrationForEvent(event.id),
+    getEventRegistrationCounts(),
+  ]);
+
+  const taken = counts[event.id] ?? 0;
+  const isFull =
+    event.max_participants != null && taken >= event.max_participants;
+  const spotsLeft =
+    event.max_participants != null
+      ? Math.max(event.max_participants - taken, 0)
+      : null;
+
+  const details = [
+    { icon: CalendarDays, label: "Date", value: formatEventDate(event.event_date) },
+    {
+      icon: Clock,
+      label: "Time",
+      value:
+        event.start_time && event.end_time
+          ? `${formatTime(event.start_time)} – ${formatTime(event.end_time)}`
+          : "TBA",
+    },
+    { icon: MapPin, label: "Venue", value: event.venue ?? "TBA" },
+    {
+      icon: IndianRupee,
+      label: "Fee",
+      value: event.registration_fee === 0 ? "Free" : formatINR(event.registration_fee),
+    },
+    {
+      icon: Users,
+      label: "Capacity",
+      value:
+        event.max_participants != null
+          ? `${taken} / ${event.max_participants} filled`
+          : "Open",
+    },
+    {
+      icon: GraduationCap,
+      label: "Eligibility",
+      value: event.eligibility ?? "Open to all students",
+    },
+  ];
+
+  return (
+    <article className="py-10 md:py-14">
+      <Container>
+        {/* Hero */}
+        <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
+          <div className="relative order-2 aspect-[16/11] overflow-hidden rounded-3xl border border-border lg:order-1">
+            <EventThumb
+              src={event.hero_image ?? event.thumbnail_image}
+              alt={event.title}
+              category={event.category}
+              sizes="(max-width: 1024px) 100vw, 50vw"
+              priority
+            />
+          </div>
+
+          <div className="order-1 flex flex-col justify-center lg:order-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="brand">{EVENT_CATEGORY_LABELS[event.category]}</Badge>
+              {!event.registration_open && <Badge tone="alert">Closed</Badge>}
+              {spotsLeft != null && spotsLeft <= 5 && spotsLeft > 0 && (
+                <Badge tone="warning">{spotsLeft} spots left</Badge>
+              )}
+            </div>
+            <h1 className="mt-4 font-display text-4xl font-semibold leading-tight text-foreground sm:text-5xl">
+              {event.title}
+            </h1>
+            <p className="mt-4 text-lg text-muted">{event.short_description}</p>
+            <div className="mt-8">
+              <RegisterCta
+                eventId={event.id}
+                slug={event.slug}
+                isLoggedIn={!!user}
+                registrationOpen={event.registration_open}
+                isFull={isFull}
+                fee={event.registration_fee}
+                existing={existing}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="mt-16 grid gap-12 lg:grid-cols-[1.4fr_1fr]">
+          <div className="space-y-12">
+            {event.description && (
+              <section>
+                <h2 className="font-display text-2xl font-semibold text-foreground">
+                  Overview
+                </h2>
+                <div className="mt-4 space-y-4 whitespace-pre-line text-base leading-relaxed text-muted">
+                  {event.description}
+                </div>
+              </section>
+            )}
+
+            {event.rules.length > 0 && (
+              <section>
+                <h2 className="flex items-center gap-2 font-display text-2xl font-semibold text-foreground">
+                  <ListChecks className="size-5 text-brand" /> Rules
+                </h2>
+                <ul className="mt-5 space-y-3">
+                  {event.rules.map((rule, i) => (
+                    <li key={i} className="flex gap-3 text-muted">
+                      <span className="mt-0.5 font-mono text-xs text-brand">
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
+                      <span>{rule}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+          </div>
+
+          {/* Details rail */}
+          <aside className="lg:sticky lg:top-24 lg:self-start">
+            <div className="rounded-2xl border border-border bg-surface p-6">
+              <h2 className="font-display text-lg font-semibold text-foreground">
+                Event details
+              </h2>
+              <dl className="mt-5 space-y-4">
+                {details.map((d) => (
+                  <div key={d.label} className="flex items-start gap-3">
+                    <d.icon className="mt-0.5 size-[18px] shrink-0 text-brand" />
+                    <div>
+                      <dt className="text-xs font-medium uppercase tracking-wide text-muted">
+                        {d.label}
+                      </dt>
+                      <dd className="text-sm font-medium text-foreground">
+                        {d.value}
+                      </dd>
+                    </div>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          </aside>
+        </div>
+      </Container>
+    </article>
+  );
+}
