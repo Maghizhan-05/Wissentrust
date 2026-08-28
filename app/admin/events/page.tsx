@@ -6,12 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/misc";
 import { getAllEventsAdmin } from "@/lib/data/admin";
 import { deleteEvent, toggleEventFlag } from "@/lib/actions/admin";
+import { requireScope } from "@/lib/auth";
 import { EVENT_CATEGORY_LABELS } from "@/lib/constants";
 import { formatEventDate, formatINR } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Admin · Events" };
 
 export default async function AdminEventsPage() {
+  await requireScope("events");
   const events = await getAllEventsAdmin();
 
   return (
@@ -55,10 +57,7 @@ export default async function AdminEventsPage() {
               {events.map((e) => (
                 <tr key={e.id} className="bg-surface hover:bg-surface-2/40">
                   <td className="px-4 py-3">
-                    <Link
-                      href={`/events/${e.slug}`}
-                      className="font-medium text-foreground hover:text-brand"
-                    >
+                    <Link href={`/events/${e.slug}`} className="font-medium text-foreground hover:text-brand">
                       {e.title}
                     </Link>
                     <p className="text-xs text-muted">/{e.slug}</p>
@@ -70,9 +69,7 @@ export default async function AdminEventsPage() {
                     {formatEventDate(e.event_date)}
                   </td>
                   <td className="px-4 py-3 font-mono text-muted">
-                    {e.registration_fee === 0
-                      ? "Free"
-                      : formatINR(e.registration_fee)}
+                    {e.registration_fee === 0 ? "Free" : formatINR(e.registration_fee)}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1.5">
@@ -87,23 +84,13 @@ export default async function AdminEventsPage() {
                       <form action={toggleEventFlag}>
                         <input type="hidden" name="id" value={e.id} />
                         <input type="hidden" name="field" value="featured" />
-                        <input
-                          type="hidden"
-                          name="value"
-                          value={String(e.featured)}
-                        />
+                        <input type="hidden" name="value" value={String(e.featured)} />
                         <button
                           type="submit"
                           title="Toggle featured"
                           className="rounded-md p-2 text-muted hover:bg-surface-2 hover:text-brand"
                         >
-                          <Star
-                            className={
-                              e.featured
-                                ? "size-4 fill-brand text-brand"
-                                : "size-4"
-                            }
-                          />
+                          <Star className={e.featured ? "size-4 fill-brand text-brand" : "size-4"} />
                         </button>
                       </form>
                       <a

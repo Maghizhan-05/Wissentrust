@@ -3,14 +3,26 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { siteUrl } from "@/lib/utils";
-import { notifyWelcome } from "@/lib/email/notify";
+import { notifySignupPending } from "@/lib/email/notify";
+import {
+  BUCKETS,
+  ID_CARD_ACCEPTED_TYPES,
+  ID_CARD_MAX_BYTES,
+} from "@/lib/constants";
 import {
   forgotSchema,
   loginSchema,
   resetSchema,
   signupSchema,
 } from "@/lib/validation/auth";
+
+const ID_CARD_EXT: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+};
 
 export type AuthState =
   | { ok: false; error: string }
@@ -36,9 +48,32 @@ export async function signIn(_prev: AuthState, formData: FormData): Promise<Auth
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword(parsed.data);
+  const { data: signInData, error } =
+    await supabase.auth.signInWithPassword(parsed.data);
   if (error) {
     return { ok: false, error: "Invalid email or password." };
+  }
+
+  // Approval gate — only approved accounts keep a session.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("approval_status")
+    .eq("id", signInData.user.id)
+    .maybeSingle();
+  const status = (profile as { approval_status?: string } | null)?.approval_status;
+  if (status !== "approved") {
+    await supabase.auth.signOut();
+    if (status === "rejected") {
+      return {
+        ok: false,
+        error: "Your account was not approved. Please contact the organizers.",
+      };
+    }
+    return {
+      ok: false,
+      error:
+        "Your account is awaiting approval. You'll get an email once an organizer approves it.",
+    };
   }
 
   const next = String(formData.get("next") ?? "/dashboard") || "/dashboard";
@@ -60,6 +95,19 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
   if (!parsed.success) {
     return { ok: false, error: firstError(parsed.error.flatten().fieldErrors) };
   }
+
+  // ID card is required for verification.
+  const idCard = formData.get("id_card");
+  if (!(idCard instanceof File) || idCard.size === 0) {
+    return { ok: false, error: "Please upload a photo of your college ID card." };
+  }
+  if (!ID_CARD_ACCEPTED_TYPES.includes(idCard.type as never)) {
+    return { ok: false, error: "ID card must be a PNG, JPG or WebP image." };
+  }
+  if (idCard.size > ID_CARD_MAX_BYTES) {
+    return { ok: false, error: "ID card image is too large (max 5 MB)." };
+  }
+
   const { email, password, ...meta } = parsed.data;
 
   const supabase = await createClient();
@@ -68,7 +116,7 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
     password,
     options: {
       data: meta,
-      emailRedirectTo: siteUrl("/auth/callback?next=/dashboard"),
+      emailRedirectTo: siteUrl("/auth/callback?next=/login"),
     },
   });
 
@@ -78,23 +126,40 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
     return { ok: false, error: error.message };
   }
 
-  // Welcome email with the participant ID (profile is created by a DB trigger).
-  if (data.user) {
+  const userId = data.user?.id;
+  if (userId) {
+    // Upload the ID card + attach it to the profile using the service role,
+    // because the new user has no session yet.
     try {
-      await notifyWelcome(data.user.id);
+      const admin = createAdminClient();
+      const buffer = Buffer.from(await idCard.arrayBuffer());
+      const ext = ID_CARD_EXT[idCard.type] ?? "png";
+      const path = `${userId}/${Date.now()}.${ext}`;
+      await admin.storage
+        .from(BUCKETS.idCards)
+        .upload(path, buffer, { contentType: idCard.type, upsert: true });
+      await admin.from("profiles").update({ id_card_path: path }).eq("id", userId);
     } catch (e) {
-      console.error("welcome email failed:", e);
+      console.error("id card upload failed:", e);
+    }
+
+    try {
+      await notifySignupPending(userId);
+    } catch (e) {
+      console.error("signup email failed:", e);
     }
   }
 
-  // If email confirmation is disabled, a session exists → go straight in.
+  // Pending users must NOT get in — drop any session Supabase created.
   if (data.session) {
-    revalidatePath("/", "layout");
-    redirect("/dashboard?welcome=1");
+    await supabase.auth.signOut();
   }
+
+  revalidatePath("/", "layout");
   return {
     ok: true,
-    message: "Check your email to confirm your account, then log in.",
+    message:
+      "Thanks! Your account is pending organizer approval. We'll email you as soon as it's approved — then you can log in.",
   };
 }
 

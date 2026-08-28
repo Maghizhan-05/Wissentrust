@@ -11,12 +11,14 @@ import {
   REGISTRATION_STATUS_LABELS,
 } from "@/lib/constants";
 import { formatEventDate } from "@/lib/utils";
+import { requireScope } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Admin · Registrations" };
 
 export default async function AdminRegistrationsPage({
   searchParams,
 }: PageProps<"/admin/registrations">) {
+  await requireScope("events");
   const sp = await searchParams;
   const filters = {
     event: typeof sp.event === "string" ? sp.event : undefined,

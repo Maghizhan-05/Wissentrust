@@ -1,7 +1,22 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import type { AdminScope } from "@/lib/constants";
 import type { ProfileRow } from "@/types/database";
+
+/** Whether a profile is any kind of admin (super or scoped). */
+export function isAdminProfile(profile: ProfileRow | null): boolean {
+  return profile?.role === "admin";
+}
+
+/** Whether a profile may access a given admin area. */
+export function profileHasScope(
+  profile: ProfileRow | null,
+  scope: AdminScope,
+): boolean {
+  if (!profile || profile.role !== "admin") return false;
+  return profile.is_super_admin || (profile.admin_scopes ?? []).includes(scope);
+}
 
 /** Returns the current auth user or null. Revalidates the token. */
 export async function getUser() {
@@ -36,17 +51,33 @@ export async function requireUser() {
   return user;
 }
 
-/** Requires a profile; redirects to /login otherwise. */
+/** Requires an approved profile; redirects otherwise. */
 export async function requireProfile(): Promise<ProfileRow> {
   const profile = await getProfile();
   if (!profile) redirect("/login");
+  if (profile.approval_status !== "approved") redirect("/pending-approval");
   return profile;
 }
 
-/** Requires an admin profile; redirects home for non-admins. */
+/** Requires an approved admin (super or scoped); redirects non-admins home. */
 export async function requireAdmin(): Promise<ProfileRow> {
   const profile = await getProfile();
   if (!profile) redirect("/login?next=/admin");
+  if (profile.approval_status !== "approved") redirect("/pending-approval");
   if (profile.role !== "admin") redirect("/");
+  return profile;
+}
+
+/** Requires an admin with a specific scope; sends other admins to the overview. */
+export async function requireScope(scope: AdminScope): Promise<ProfileRow> {
+  const profile = await requireAdmin();
+  if (!profileHasScope(profile, scope)) redirect("/admin");
+  return profile;
+}
+
+/** Requires the super admin. */
+export async function requireSuperAdmin(): Promise<ProfileRow> {
+  const profile = await requireAdmin();
+  if (!profile.is_super_admin) redirect("/admin");
   return profile;
 }

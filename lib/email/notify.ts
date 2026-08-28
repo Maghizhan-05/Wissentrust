@@ -2,9 +2,12 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendMail } from "./mailer";
 import {
+  approvalGrantedEmail,
+  approvalRejectedEmail,
   paymentConfirmedEmail,
   paymentUnderReviewEmail,
   registrationEmail,
+  signupPendingEmail,
   welcomeEmail,
 } from "./templates";
 import type { EventRow, ProfileRow, RegistrationRow } from "@/types/database";
@@ -38,16 +41,41 @@ async function loadRegistration(registrationId: string): Promise<{
   };
 }
 
-export async function notifyWelcome(userId: string): Promise<void> {
+async function loadProfile(userId: string): Promise<ProfileRow | null> {
   const admin = createAdminClient();
-  const { data: profile } = await admin
+  const { data } = await admin
     .from("profiles")
     .select("*")
     .eq("id", userId)
     .maybeSingle();
-  if (!profile) return;
-  const p = profile as ProfileRow;
+  return (data as ProfileRow) ?? null;
+}
+
+export async function notifyWelcome(userId: string): Promise<void> {
+  const p = await loadProfile(userId);
+  if (!p) return;
   const { subject, html } = welcomeEmail(p.full_name, p.participant_id);
+  await sendMail({ to: p.email, subject, html });
+}
+
+export async function notifySignupPending(userId: string): Promise<void> {
+  const p = await loadProfile(userId);
+  if (!p) return;
+  const { subject, html } = signupPendingEmail(p.full_name);
+  await sendMail({ to: p.email, subject, html });
+}
+
+export async function notifyApproval(userId: string): Promise<void> {
+  const p = await loadProfile(userId);
+  if (!p) return;
+  const { subject, html } = approvalGrantedEmail(p.full_name, p.participant_id);
+  await sendMail({ to: p.email, subject, html });
+}
+
+export async function notifyRejection(userId: string): Promise<void> {
+  const p = await loadProfile(userId);
+  if (!p) return;
+  const { subject, html } = approvalRejectedEmail(p.full_name);
   await sendMail({ to: p.email, subject, html });
 }
 

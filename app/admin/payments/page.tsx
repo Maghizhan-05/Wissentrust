@@ -5,10 +5,12 @@ import { PaymentBadge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/misc";
 import { getPaymentQueue } from "@/lib/data/admin";
 import { formatEventDate, formatINR } from "@/lib/utils";
+import { requireScope } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Admin · Payments" };
 
 export default async function AdminPaymentsPage() {
+  await requireScope("payments");
   const queue = await getPaymentQueue();
 
   return (

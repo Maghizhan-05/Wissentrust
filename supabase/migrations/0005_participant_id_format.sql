@@ -15,7 +15,7 @@ begin
     return new;
   end if;
   new.participant_id :=
-    'WD27/' || lpad(nextval('public.participant_seq')::text, 4, '0');
+    'W27/E/' || lpad(nextval('public.participant_seq')::text, 4, '0');
   return new;
 end $$;
 

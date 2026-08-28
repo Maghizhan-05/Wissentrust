@@ -4,6 +4,8 @@
  * `supabase gen types`). Money is stored as INTEGER PAISE everywhere.
  */
 import type {
+  AdminScope,
+  ApprovalStatus,
   EventCategory,
   PaymentStatus,
   RegistrationStatus,
@@ -12,7 +14,7 @@ import type {
 
 export interface ProfileRow {
   id: string; // = auth.users.id
-  participant_id: string; // 5-char, unique
+  participant_id: string; // unique
   full_name: string;
   email: string;
   phone: string | null;
@@ -21,6 +23,12 @@ export interface ProfileRow {
   year: string | null;
   profile_photo: string | null;
   role: UserRole;
+  approval_status: ApprovalStatus;
+  id_card_path: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  is_super_admin: boolean;
+  admin_scopes: AdminScope[];
   created_at: string;
   updated_at: string;
 }

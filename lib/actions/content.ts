@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { requireAdmin } from "@/lib/auth";
+import { requireScope } from "@/lib/auth";
 
 const titledBody = z.object({
   title: z.string().trim().max(120),
@@ -84,7 +84,7 @@ export async function updateLandingContent(
   _prev: ContentState,
   formData: FormData,
 ): Promise<ContentState> {
-  await requireAdmin();
+  await requireScope("content");
 
   const raw = String(formData.get("content") ?? "");
   let parsedJson: unknown;

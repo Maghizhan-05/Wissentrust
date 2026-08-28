@@ -3,10 +3,12 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { EventForm } from "@/components/admin/event-form";
 import { createEvent } from "@/lib/actions/admin";
+import { requireScope } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Admin · New event" };
 
-export default function NewEventPage() {
+export default async function NewEventPage() {
+  await requireScope("events");
   return (
     <div className="mx-auto max-w-3xl">
       <Link

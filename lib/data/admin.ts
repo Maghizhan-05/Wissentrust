@@ -161,6 +161,35 @@ export async function getPaymentQueue(): Promise<
   return (data as RegistrationWithEventAndProfile[]) ?? [];
 }
 
+export async function getPendingSignups(): Promise<ProfileRow[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("approval_status", "pending")
+    .order("created_at", { ascending: true });
+  return (data as ProfileRow[]) ?? [];
+}
+
+export async function countPendingSignups(): Promise<number> {
+  const supabase = await createClient();
+  const { count } = await supabase
+    .from("profiles")
+    .select("*", { count: "exact", head: true })
+    .eq("approval_status", "pending");
+  return count ?? 0;
+}
+
+export async function getProfileAdmin(id: string): Promise<ProfileRow | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  return (data as ProfileRow) ?? null;
+}
+
 export async function getUsersAdmin(search?: string): Promise<ProfileRow[]> {
   const supabase = await createClient();
   let query = supabase

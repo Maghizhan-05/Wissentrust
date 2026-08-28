@@ -32,6 +32,38 @@ function pid(participantId: string): string {
   return `<span style="font-family:monospace;background:#ecf6f4;border:1px solid #d5e5e2;border-radius:6px;padding:2px 8px;color:#087f78;font-weight:700;">${participantId}</span>`;
 }
 
+export function signupPendingEmail(name: string) {
+  return {
+    subject: "We received your Wissendrust'27 signup",
+    html: shell(
+      `Thanks, ${name || "there"} 👋`,
+      `<p style="line-height:1.6;">Your account and ID card have been received and are now waiting for an organizer to approve.</p>
+       <p style="line-height:1.6;color:#627775;">You'll get another email the moment you're approved — then you can log in and start registering for events.</p>`,
+    ),
+  };
+}
+
+export function approvalGrantedEmail(name: string, participantId: string) {
+  return {
+    subject: "You're approved — welcome to Wissendrust'27 ✅",
+    html: shell(
+      `You're in, ${name || "there"}! 🎉`,
+      `<p style="line-height:1.6;">An organizer has approved your account. You can now log in. Your participant ID is ${pid(participantId)} — keep it handy for every event and payment.</p>`,
+      { label: "Log in", href: siteUrl("/login") },
+    ),
+  };
+}
+
+export function approvalRejectedEmail(name: string) {
+  return {
+    subject: "Update on your Wissendrust'27 signup",
+    html: shell(
+      `Hi ${name || "there"}`,
+      `<p style="line-height:1.6;">We're sorry — your account could not be approved at this time. If you think this is a mistake, please reply to this email or contact the organizers.</p>`,
+    ),
+  };
+}
+
 export function welcomeEmail(name: string, participantId: string) {
   return {
     subject: "Welcome to Wissendrust'27 — your participant ID",

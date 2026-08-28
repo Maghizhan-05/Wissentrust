@@ -4,10 +4,20 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireAdmin } from "@/lib/auth";
+import { requireScope, requireSuperAdmin } from "@/lib/auth";
 import { eventSchema, type EventInput } from "@/lib/validation/event";
-import { notifyPaymentConfirmed } from "@/lib/email/notify";
-import { BUCKETS, PAYMENT_STATUSES, USER_ROLES } from "@/lib/constants";
+import {
+  notifyApproval,
+  notifyPaymentConfirmed,
+  notifyRejection,
+} from "@/lib/email/notify";
+import {
+  ADMIN_SCOPES,
+  APPROVAL_STATUSES,
+  BUCKETS,
+  PAYMENT_STATUSES,
+  USER_ROLES,
+} from "@/lib/constants";
 
 export type AdminActionState =
   | { ok: false; error: string }
@@ -70,7 +80,7 @@ export async function createEvent(
   _prev: AdminActionState,
   formData: FormData,
 ): Promise<AdminActionState> {
-  await requireAdmin();
+  await requireScope("events");
   const parsed = parseEventForm(formData);
   if (!parsed.success) {
     const first = Object.values(parsed.error.flatten().fieldErrors).flat()[0];
@@ -93,7 +103,7 @@ export async function updateEvent(
   _prev: AdminActionState,
   formData: FormData,
 ): Promise<AdminActionState> {
-  await requireAdmin();
+  await requireScope("events");
   const id = String(formData.get("id") ?? "");
   if (!id) return { ok: false, error: "Missing event id." };
 
@@ -119,7 +129,7 @@ export async function updateEvent(
 }
 
 export async function deleteEvent(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireScope("events");
   const id = String(formData.get("id") ?? "");
   if (!id) return;
   const supabase = await createClient();
@@ -129,7 +139,7 @@ export async function deleteEvent(formData: FormData): Promise<void> {
 }
 
 export async function toggleEventFlag(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireScope("events");
   const id = String(formData.get("id") ?? "");
   const field = String(formData.get("field") ?? "");
   const value = formData.get("value") === "true";
@@ -144,7 +154,7 @@ export async function toggleEventFlag(formData: FormData): Promise<void> {
 export async function setPaymentStatus(
   formData: FormData,
 ): Promise<AdminActionState> {
-  await requireAdmin();
+  await requireScope("payments");
   const registrationId = String(formData.get("registration_id") ?? "");
   const status = String(formData.get("status") ?? "");
   const note = String(formData.get("note") ?? "").trim() || null;
@@ -177,32 +187,90 @@ export async function setPaymentStatus(
   return { ok: true, message: "Payment status updated." };
 }
 
-export async function setUserRole(formData: FormData): Promise<AdminActionState> {
-  await requireAdmin();
+/** Approve / reject a pending signup (signups scope). Emails the user. */
+export async function setApproval(formData: FormData): Promise<AdminActionState> {
+  await requireScope("signups");
   const userId = String(formData.get("user_id") ?? "");
-  const role = String(formData.get("role") ?? "");
+  const status = String(formData.get("status") ?? "");
+  if (!userId || !APPROVAL_STATUSES.includes(status as never))
+    return { ok: false, error: "Invalid request." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_set_approval", {
+    p_user_id: userId,
+    p_status: status,
+  });
+  if (error) return { ok: false, error: "Could not update approval." };
+
+  if (status === "approved") {
+    try {
+      await notifyApproval(userId);
+    } catch (e) {
+      console.error("approval email failed:", e);
+    }
+  } else if (status === "rejected") {
+    try {
+      await notifyRejection(userId);
+    } catch (e) {
+      console.error("rejection email failed:", e);
+    }
+  }
+
+  revalidatePath("/admin/approvals");
+  revalidatePath(`/admin/approvals/${userId}`);
+  revalidatePath("/admin/users");
+  revalidatePath("/admin");
+  return { ok: true, message: "Approval updated." };
+}
+
+/** Super admin: set a user's role, super flag and scopes. */
+export async function setAdminAccess(formData: FormData): Promise<AdminActionState> {
+  await requireSuperAdmin();
+  const userId = String(formData.get("user_id") ?? "");
+  const role = String(formData.get("role") ?? "user");
+  const isSuper = formData.get("is_super_admin") != null;
+  const scopes = formData
+    .getAll("scopes")
+    .map(String)
+    .filter((s) => (ADMIN_SCOPES as readonly string[]).includes(s));
   if (!userId || !USER_ROLES.includes(role as never))
     return { ok: false, error: "Invalid request." };
 
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("profiles")
-    .update({ role })
-    .eq("id", userId);
-  if (error) return { ok: false, error: "Could not update role." };
+  const { error } = await supabase.rpc("super_set_admin", {
+    p_user_id: userId,
+    p_role: role,
+    p_super: role === "admin" && isSuper,
+    p_scopes: scopes,
+  });
+  if (error) {
+    if (error.message.includes("CANNOT_DEMOTE_SELF"))
+      return { ok: false, error: "You can't remove your own super-admin access." };
+    return { ok: false, error: "Could not update admin access." };
+  }
   revalidatePath(`/admin/users/${userId}`);
   revalidatePath("/admin/users");
-  return { ok: true, message: "Role updated." };
+  return { ok: true, message: "Admin access updated." };
 }
 
-/** Short-lived signed URL for a private payment screenshot (admin only). */
+/** Short-lived signed URL for a private payment screenshot (payments scope). */
 export async function getScreenshotSignedUrl(
   path: string,
 ): Promise<string | null> {
-  await requireAdmin();
+  await requireScope("payments");
   const admin = createAdminClient();
   const { data } = await admin.storage
     .from(BUCKETS.paymentScreenshots)
+    .createSignedUrl(path, 60 * 10);
+  return data?.signedUrl ?? null;
+}
+
+/** Short-lived signed URL for a private ID card (signups scope). */
+export async function getIdCardSignedUrl(path: string): Promise<string | null> {
+  await requireScope("signups");
+  const admin = createAdminClient();
+  const { data } = await admin.storage
+    .from(BUCKETS.idCards)
     .createSignedUrl(path, 60 * 10);
   return data?.signedUrl ?? null;
 }

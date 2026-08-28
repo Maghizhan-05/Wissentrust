@@ -46,7 +46,7 @@ const ArrowContent = ({
 }: Pick<CommonProps, "children" | "withArrow" | "loading">) => (
   <>
     {loading && <Loader2 className="size-4 animate-spin" aria-hidden />}
-    <span>{children}</span>
+    <span className="inline-flex items-center gap-2">{children}</span>
     {withArrow && !loading && (
       <span
         aria-hidden

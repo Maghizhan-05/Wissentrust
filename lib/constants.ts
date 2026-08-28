@@ -46,6 +46,26 @@ export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 export const USER_ROLES = ["user", "admin"] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
+export const APPROVAL_STATUSES = ["pending", "approved", "rejected"] as const;
+export type ApprovalStatus = (typeof APPROVAL_STATUSES)[number];
+
+export const APPROVAL_STATUS_LABELS: Record<ApprovalStatus, string> = {
+  pending: "Pending approval",
+  approved: "Approved",
+  rejected: "Rejected",
+};
+
+/** Granular admin permission areas. A super admin implicitly has all. */
+export const ADMIN_SCOPES = ["signups", "events", "payments", "content"] as const;
+export type AdminScope = (typeof ADMIN_SCOPES)[number];
+
+export const ADMIN_SCOPE_LABELS: Record<AdminScope, string> = {
+  signups: "Signup approvals",
+  events: "Events & registrations",
+  payments: "Payment approvals",
+  content: "Landing page",
+};
+
 export const REGISTRATION_STATUS_LABELS: Record<RegistrationStatus, string> = {
   pending: "Pending",
   confirmed: "Confirmed",
@@ -67,7 +87,16 @@ export const BUCKETS = {
   eventImages: "event-images",
   paymentScreenshots: "payment-screenshots",
   profileImages: "profile-images",
+  idCards: "id-cards",
 } as const;
+
+/** ID-card upload constraints (also enforced server-side). */
+export const ID_CARD_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+export const ID_CARD_ACCEPTED_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+] as const;
 
 /** Payment screenshot upload constraints (also enforced server-side). */
 export const SCREENSHOT_MAX_BYTES = 5 * 1024 * 1024; // 5 MB

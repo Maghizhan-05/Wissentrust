@@ -2,10 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { PaymentBadge, RegistrationBadge } from "@/components/ui/badge";
-import { UserRoleForm } from "@/components/admin/user-role-form";
+import { Badge, PaymentBadge, RegistrationBadge } from "@/components/ui/badge";
+import { AdminAccessForm } from "@/components/admin/admin-access-form";
+import { ApprovalActions } from "@/components/admin/approval-actions";
 import { EmptyState } from "@/components/ui/misc";
 import { getUserWithRegistrations } from "@/lib/data/admin";
+import { requireScope } from "@/lib/auth";
+import { ADMIN_SCOPE_LABELS, APPROVAL_STATUS_LABELS } from "@/lib/constants";
 import { formatEventDate } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Admin · User" };
@@ -13,10 +16,18 @@ export const metadata: Metadata = { title: "Admin · User" };
 export default async function AdminUserPage({
   params,
 }: PageProps<"/admin/users/[id]">) {
+  const viewer = await requireScope("signups");
   const { id } = await params;
   const data = await getUserWithRegistrations(id);
   if (!data) notFound();
   const { profile, registrations } = data;
+
+  const approvalTone =
+    profile.approval_status === "approved"
+      ? "success"
+      : profile.approval_status === "rejected"
+        ? "alert"
+        : "warning";
 
   const fields = [
     ["Email", profile.email],
@@ -43,11 +54,32 @@ export default async function AdminUserPage({
               {profile.full_name || "Unnamed participant"}
             </h1>
           </div>
-          <div className="flex flex-col items-end gap-1">
-            <span className="text-xs text-muted">Role</span>
-            <UserRoleForm userId={profile.id} role={profile.role} />
+          <div className="flex flex-col items-end gap-2">
+            <Badge tone={approvalTone}>
+              {APPROVAL_STATUS_LABELS[profile.approval_status]}
+            </Badge>
+            {profile.role === "admin" && (
+              <Badge tone="brand">
+                {profile.is_super_admin
+                  ? "Super admin"
+                  : profile.admin_scopes.length
+                    ? profile.admin_scopes
+                        .map((s) => ADMIN_SCOPE_LABELS[s])
+                        .join(", ")
+                    : "Admin (no scopes)"}
+              </Badge>
+            )}
           </div>
         </div>
+
+        {profile.approval_status === "pending" && (
+          <div className="mt-5 rounded-xl border border-warning/30 bg-warning/10 p-4">
+            <p className="mb-2 text-sm font-medium text-foreground">
+              This account is awaiting approval
+            </p>
+            <ApprovalActions userId={profile.id} compact />
+          </div>
+        )}
 
         <dl className="mt-6 grid gap-4 sm:grid-cols-2">
           {fields.map(([label, value]) => (
@@ -60,6 +92,25 @@ export default async function AdminUserPage({
           ))}
         </dl>
       </div>
+
+      {viewer.is_super_admin && (
+        <div className="rounded-2xl border border-border bg-surface p-6">
+          <h2 className="font-display text-lg font-semibold text-foreground">
+            Admin access
+          </h2>
+          <p className="mt-1 text-sm text-muted">
+            Grant staff access and choose which areas this person can manage.
+          </p>
+          <div className="mt-4 max-w-md">
+            <AdminAccessForm
+              userId={profile.id}
+              role={profile.role}
+              isSuper={profile.is_super_admin}
+              scopes={profile.admin_scopes}
+            />
+          </div>
+        </div>
+      )}
 
       <div>
         <h2 className="font-display text-lg font-semibold text-foreground">

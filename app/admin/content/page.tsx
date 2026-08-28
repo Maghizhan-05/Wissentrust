@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import { ArrowUpRight } from "lucide-react";
 import { LandingEditor } from "@/components/admin/landing-editor";
 import { getLandingContent } from "@/lib/data/settings";
+import { requireScope } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Admin · Landing page" };
 
 export default async function AdminContentPage() {
+  await requireScope("content");
   const content = await getLandingContent();
 
   return (

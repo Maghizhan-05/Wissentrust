@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import ExcelJS from "exceljs";
-import { requireAdmin } from "@/lib/auth";
+import { requireScope } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import {
   PAYMENT_STATUS_LABELS,
@@ -32,7 +32,7 @@ export async function GET(
   _req: NextRequest,
   ctx: RouteContext<"/admin/events/[id]/export">,
 ) {
-  await requireAdmin(); // redirects non-admins
+  await requireScope("events"); // redirects admins without the events scope
   const { id } = await ctx.params;
 
   const supabase = await createClient();
@@ -129,8 +129,7 @@ export async function GET(
       college: r.college ?? "",
       course: r.course ?? "",
       year: r.year ?? "",
-      payment_status:
-        PAYMENT_STATUS_LABELS[r.payment_status] ?? r.payment_status,
+      payment_status: PAYMENT_STATUS_LABELS[r.payment_status] ?? r.payment_status,
       registration_status:
         REGISTRATION_STATUS_LABELS[r.registration_status] ??
         r.registration_status,

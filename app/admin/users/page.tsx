@@ -4,12 +4,14 @@ import { Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/misc";
 import { getUsersAdmin } from "@/lib/data/admin";
+import { requireScope } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Admin · Users" };
 
 export default async function AdminUsersPage({
   searchParams,
 }: PageProps<"/admin/users">) {
+  await requireScope("signups");
   const sp = await searchParams;
   const q = typeof sp.q === "string" ? sp.q : "";
   const users = await getUsersAdmin(q);

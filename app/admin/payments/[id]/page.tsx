@@ -6,6 +6,7 @@ import { PaymentBadge, RegistrationBadge } from "@/components/ui/badge";
 import { PaymentReviewActions } from "@/components/admin/payment-review-actions";
 import { getRegistrationAdmin } from "@/lib/data/admin";
 import { getScreenshotSignedUrl } from "@/lib/actions/admin";
+import { requireScope } from "@/lib/auth";
 import { formatEventDate, formatINR } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Admin · Payment review" };
@@ -13,6 +14,7 @@ export const metadata: Metadata = { title: "Admin · Payment review" };
 export default async function PaymentReviewPage({
   params,
 }: PageProps<"/admin/payments/[id]">) {
+  await requireScope("payments");
   const { id } = await params;
   const reg = await getRegistrationAdmin(id);
   if (!reg) notFound();

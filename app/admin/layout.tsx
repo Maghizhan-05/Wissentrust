@@ -5,10 +5,15 @@ import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { requireAdmin } from "@/lib/auth";
 import { signOut } from "@/lib/actions/auth";
+import { countPendingSignups } from "@/lib/data/admin";
 import { SITE } from "@/lib/constants";
 
 export default async function AdminLayout({ children }: LayoutProps<"/">) {
   const profile = await requireAdmin();
+  const pending =
+    profile.is_super_admin || profile.admin_scopes.includes("signups")
+      ? await countPendingSignups()
+      : 0;
 
   return (
     <div className="min-h-svh bg-background">
@@ -45,7 +50,11 @@ export default async function AdminLayout({ children }: LayoutProps<"/">) {
       <div className="mx-auto flex max-w-[1400px] flex-col md:flex-row">
         <aside className="border-b border-border md:w-56 md:shrink-0 md:border-b-0 md:border-r">
           <div className="md:sticky md:top-14">
-            <AdminSidebar />
+            <AdminSidebar
+              scopes={profile.admin_scopes}
+              isSuper={profile.is_super_admin}
+              pendingCount={pending}
+            />
           </div>
         </aside>
         <main className="min-w-0 flex-1 p-4 sm:p-6">{children}</main>
